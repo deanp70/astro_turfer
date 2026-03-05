@@ -1,0 +1,39 @@
+{
+  "id": "moon-1",
+  "theme": "moon",
+  "tilemapKey": "tilemap-moon-01",
+  "backgroundLayers": [
+    { "key": "bg-moon", "scrollFactorX": 0.05, "tint": 1119768, "alpha": 1 },
+    { "key": "bg-moon", "scrollFactorX": 0.12, "tint": 1710876, "alpha": 0.85 }
+  ],
+  "musicKey": "music-moon",
+  "spawn": { "x": 80, "y": 240 },
+  "goal": { "x": 2050, "y": 510 },
+  "hazards": [
+    { "id": "moon-spike-a", "x": 470, "y": 560, "width": 28, "height": 20, "kind": "spike" },
+    { "id": "moon-spike-b", "x": 940, "y": 560, "width": 28, "height": 20, "kind": "spike" },
+    { "id": "moon-lava-a", "x": 1460, "y": 570, "width": 84, "height": 16, "kind": "lava" }
+  ],
+  "collectibles": [
+    { "id": "moon-crystal-a", "x": 340, "y": 450, "value": 50, "kind": "crystal" },
+    { "id": "moon-crystal-b", "x": 1030, "y": 410, "value": 50, "kind": "crystal" },
+    { "id": "moon-oxygen-a", "x": 1560, "y": 490, "value": 90, "kind": "oxygen" }
+  ],
+  "platforms": [
+    { "x": 160, "y": 600, "width": 620, "height": 16 },
+    { "x": 890, "y": 600, "width": 760, "height": 16 },
+    { "x": 430, "y": 520, "width": 200, "height": 16 },
+    { "x": 770, "y": 480, "width": 210, "height": 16 },
+    { "x": 1150, "y": 450, "width": 270, "height": 16 },
+    { "x": 1650, "y": 530, "width": 360, "height": 16 }
+  ],
+  "enemies": [
+    { "id": "moon-drone-1", "x": 620, "y": 580, "patrolDistance": 120, "speed": 80 },
+    { "id": "moon-drone-2", "x": 1280, "y": 430, "patrolDistance": 90, "speed": 90 }
+  ],
+  "checkpoints": [
+    { "x": 1100, "y": 420 },
+    { "x": 1680, "y": 500 }
+  ],
+  "timeLimitSeconds": 130
+}
