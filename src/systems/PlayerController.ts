@@ -8,12 +8,12 @@ interface PlayerConfig {
 }
 
 const DEFAULT_CONFIG: PlayerConfig = {
-  runSpeed: 220,
-  jumpVelocity: 470,
-  coyoteTimeMs: 120,
-  jumpBufferMs: 120,
-  gravityScale: 1.2,
-  maxFallSpeed: 620
+  runSpeed: 240,
+  jumpVelocity: 560,
+  coyoteTimeMs: 140,
+  jumpBufferMs: 140,
+  gravityScale: 1.0,
+  maxFallSpeed: 760
 };
 
 export class PlayerController {

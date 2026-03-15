@@ -1,14 +1,31 @@
 export const textureKeys = {
-  player: 'player-astronaut',
-  platform: 'platform-tile',
-  hazard: 'hazard-spike',
-  collectible: 'collectible-crystal',
-  enemy: 'enemy-drone',
+  playerWalk: 'player-astronaut-walk',
+  playerIdle: 'player-astronaut-idle',
+  playerJump: 'player-astronaut-jump',
+  platform: 'platform-rock',
   checkpoint: 'checkpoint-flag',
-  goal: 'goal-beacon',
+  hazard: 'hazard-spike',
+  characters: 'pixel-characters',
+  goal: 'goal-shuttle',
+  goalMenu: 'goal-shuttle-menu',
+  bgStars: 'bg-stars',
   bgMoon: 'bg-moon',
   bgMars: 'bg-mars',
-  bgEuropa: 'bg-europa'
+  bgEuropa: 'bg-europa',
+  hudPanel: 'hud-panel'
+} as const;
+
+export const animationKeys = {
+  playerIdle: 'player-idle',
+  playerWalk: 'player-walk',
+  playerJump: 'player-jump',
+  enemyHover: 'enemy-hover',
+  collectiblePulse: 'collectible-pulse'
+} as const;
+
+export const characterFrames = {
+  collectible: 13,
+  enemyFrames: [23, 24, 25, 26] as const
 } as const;
 
 export const levelJsonKeys = {

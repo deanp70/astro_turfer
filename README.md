@@ -1,33 +1,62 @@
-# Astronaut Planet Platformer
+# Astro Turfer
 
-Web-first Phaser 3 + TypeScript sidescroller inspired by classic Mario pacing.
+Web-first Phaser 3 platformer where an astronaut surfs across Moon, Mars, and Europa-style obstacle courses.
 
-## Implemented
-- Phaser 3 + TypeScript + Vite project scaffold
-- Boot scene + World scene + HUD scene contracts
-- Typed level manifest format in JSON (`public/levels/*.json`)
-- Three themed levels: Moon, Mars, Europa
-- Astronaut movement with coyote time + jump buffer
-- Enemy stomp vs damage logic
-- Hazards, collectibles, checkpoints, level transitions
-- HUD metrics (level, lives, score, oxygen, time)
-- Asset licensing ledger (`docs/ASSET_LICENSES.md`)
+![Gameplay screenshot](./screenshot.png)
 
-## Run
-1. `npm install`
-2. `npm run dev`
-3. Open `http://localhost:5173`
+## Play
+
+Local development:
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`.
+
+Production build:
+
+```bash
+npm run build
+```
 
 ## Controls
-- Move: `Left` / `Right`
-- Jump: `Up` or `Space`
 
-## External Assets
-- Drop downloaded packs into `public/assets/` (see `public/assets/README.md`)
-- Replace placeholder generated textures in `src/scenes/BootScene.ts` with `this.load.image(...)`/spritesheets/audio
+- `Left` / `Right`: move
+- `Up` or `Space`: jump
+- `P` or `Esc`: pause
+- `H`: toggle help
 
-## Level Manifest Contract
-Each `public/levels/*.json` includes:
-- `id`, `theme`, `tilemapKey`, `backgroundLayers[]`, `musicKey`
-- `spawn`, `goal`, `hazards[]`, `collectibles[]`
-- `platforms[]`, `enemies[]`, `checkpoints[]`, `timeLimitSeconds`
+## Gameplay
+
+- Collect crystals to increase score and recover oxygen.
+- Activate flag terminals to set checkpoints.
+- Avoid drones, spikes, lava, and ground gaps.
+- Reach the shuttle before oxygen or time runs out.
+
+## GitHub Pages
+
+This repo is configured for GitHub Pages project hosting at:
+
+- [https://deanp70.github.io/astro_turfer/](https://deanp70.github.io/astro_turfer/)
+
+Deployment uses the workflow in [deploy.yml](/Users/dean/Talos/opencode_workspace/game_dev/.github/workflows/deploy.yml). Pushes to `main` trigger a fresh build and deploy.
+
+GitHub repo setup:
+
+1. Push this project to `deanp70/astro_turfer`.
+2. In GitHub repo settings, open `Pages`.
+3. Set the source to `GitHub Actions` if GitHub has not done that automatically.
+
+## Credits
+
+- Astronaut / shuttle / lunar platform art: [amizg](https://amizg.itch.io/)
+- Asset credit requested by the artist: [https://amizg.itch.io/](https://amizg.itch.io/)
+- Additional art and sound packs: [Kenney](https://kenney.nl/)
+
+Detailed asset notes are in [ASSET_LICENSES.md](/Users/dean/Talos/opencode_workspace/game_dev/docs/ASSET_LICENSES.md).
+
+## License
+
+Source code is licensed under the MIT License. See [LICENSE](/Users/dean/Talos/opencode_workspace/game_dev/LICENSE).

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { HudScene } from './scenes/HudScene';
+import { MainMenuScene } from './scenes/MainMenuScene';
 import { WorldScene } from './scenes/WorldScene';
 
 const game = new Phaser.Game({
@@ -23,7 +24,7 @@ const game = new Phaser.Game({
     width: 1280,
     height: 720
   },
-  scene: [BootScene, WorldScene, HudScene]
+  scene: [BootScene, MainMenuScene, WorldScene, HudScene]
 });
 
 export default game;
