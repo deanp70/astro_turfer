@@ -1,4 +1,5 @@
 import { characterFrames, textureKeys } from '../assets/assetKeys';
+import { shouldUseTouchControls } from '../utils/device';
 
 export class MainMenuScene extends Phaser.Scene {
   private started = false;
@@ -9,6 +10,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   create(): void {
     this.started = false;
+    const touchControlsEnabled = shouldUseTouchControls(this);
     this.cameras.main.setBackgroundColor(0x03050c);
 
     this.add
@@ -108,7 +110,9 @@ export class MainMenuScene extends Phaser.Scene {
       .text(
         748,
         300,
-        'CONTROLS\nLeft / Right: Move\nUp or Space: Jump\nP or Esc: Pause\nH: Toggle help panel',
+        touchControlsEnabled
+          ? 'PHONE CONTROLS\nBottom-left arrows: Move\nBottom-right JUMP: Jump\nTop-right PAUSE: Pause\nTap anywhere: Start'
+          : 'CONTROLS\nLeft / Right: Move\nUp or Space: Jump\nP or Esc: Pause\nH: Toggle help panel',
         {
           fontFamily: 'monospace',
           fontSize: '26px',
@@ -121,7 +125,7 @@ export class MainMenuScene extends Phaser.Scene {
       .setOrigin(0, 0);
 
     const startText = this.add
-      .text(640, 620, 'Press Enter / Space or click to start', {
+      .text(640, 620, touchControlsEnabled ? 'Tap anywhere to start' : 'Press Enter / Space or click to start', {
         fontFamily: 'monospace',
         fontSize: '28px',
         color: '#b6ffbf',

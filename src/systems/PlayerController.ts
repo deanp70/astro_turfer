@@ -7,6 +7,12 @@ interface PlayerConfig {
   maxFallSpeed: number;
 }
 
+interface VirtualControlState {
+  left: boolean;
+  right: boolean;
+  jump: boolean;
+}
+
 const DEFAULT_CONFIG: PlayerConfig = {
   runSpeed: 240,
   jumpVelocity: 560,
@@ -23,9 +29,17 @@ export class PlayerController {
 
   private readonly config: PlayerConfig;
 
+  private virtualInput: VirtualControlState = {
+    left: false,
+    right: false,
+    jump: false
+  };
+
   private lastGroundedTime = -Infinity;
 
   private lastJumpPressedTime = -Infinity;
+
+  private previousVirtualJumpDown = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -38,12 +52,22 @@ export class PlayerController {
 
     this.body.setCollideWorldBounds(true);
     this.body.setGravityY(this.scene.physics.world.gravity.y * (this.config.gravityScale - 1));
+
+    this.scene.game.events.on('controls:touch', this.handleVirtualInput, this);
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scene.game.events.off('controls:touch', this.handleVirtualInput, this);
+    });
   }
 
   update(now: number): void {
     this.applyHorizontalMovement();
 
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space)) {
+    const jumpJustPressed =
+      Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
+      Phaser.Input.Keyboard.JustDown(this.cursors.space) ||
+      (this.virtualInput.jump && !this.previousVirtualJumpDown);
+
+    if (jumpJustPressed) {
       this.lastJumpPressedTime = now;
     }
 
@@ -64,9 +88,16 @@ export class PlayerController {
       this.body.setVelocityY(this.config.maxFallSpeed);
     }
 
-    if ((Phaser.Input.Keyboard.JustUp(this.cursors.up) || Phaser.Input.Keyboard.JustUp(this.cursors.space)) && this.body.velocity.y < -90) {
+    const jumpJustReleased =
+      Phaser.Input.Keyboard.JustUp(this.cursors.up) ||
+      Phaser.Input.Keyboard.JustUp(this.cursors.space) ||
+      (!this.virtualInput.jump && this.previousVirtualJumpDown);
+
+    if (jumpJustReleased && this.body.velocity.y < -90) {
       this.body.setVelocityY(this.body.velocity.y * 0.5);
     }
+
+    this.previousVirtualJumpDown = this.virtualInput.jump;
   }
 
   bounceOffEnemy(): void {
@@ -74,8 +105,8 @@ export class PlayerController {
   }
 
   private applyHorizontalMovement(): void {
-    const leftDown = this.cursors.left?.isDown;
-    const rightDown = this.cursors.right?.isDown;
+    const leftDown = Boolean(this.cursors.left?.isDown || this.virtualInput.left);
+    const rightDown = Boolean(this.cursors.right?.isDown || this.virtualInput.right);
 
     if (leftDown && !rightDown) {
       this.body.setVelocityX(-this.config.runSpeed);
@@ -90,5 +121,9 @@ export class PlayerController {
     }
 
     this.body.setVelocityX(0);
+  }
+
+  private handleVirtualInput(nextState: Partial<VirtualControlState>): void {
+    this.virtualInput = { ...this.virtualInput, ...nextState };
   }
 }

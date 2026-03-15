@@ -2,6 +2,7 @@ import { animationKeys, audioKeys, characterFrames, textureKeys } from '../asset
 import { Player } from '../entities/Player';
 import { levelCount, loadLevelByIndex } from '../levels/registry';
 import type { LevelCollectible, LevelData, LevelHazard, LevelTheme } from '../types/level';
+import { shouldUseTouchControls } from '../utils/device';
 
 interface WorldInitData {
   levelIndex: number;
@@ -69,8 +70,8 @@ const THEME_PALETTES: Record<LevelTheme, ThemePalette> = {
 
 const LENGTH_BOOST_BY_LEVEL = [0, 900, 1800] as const;
 const GROUND_SEGMENT_WIDTH = 64;
-const GROUND_THICKNESS = 96;
-const GROUND_TOP_Y = 656;
+const GROUND_THICKNESS = 80;
+const GROUND_TOP_Y = 640;
 
 export class WorldScene extends Phaser.Scene {
   private levelIndex = 0;
@@ -119,6 +120,10 @@ export class WorldScene extends Phaser.Scene {
 
   private isPaused = false;
 
+  private touchPauseRequested = false;
+
+  private touchControlsEnabled = false;
+
   private pauseOverlay!: Phaser.GameObjects.Container;
 
   private groundGaps: GroundGap[] = [];
@@ -132,11 +137,13 @@ export class WorldScene extends Phaser.Scene {
     this.lives = data.lives ?? 3;
     this.score = data.score ?? 0;
     this.isPaused = false;
+    this.touchPauseRequested = false;
   }
 
   create(): void {
     this.currentLevel = loadLevelByIndex(this, this.levelIndex);
     this.palette = THEME_PALETTES[this.currentLevel.theme] ?? THEME_PALETTES.custom;
+    this.touchControlsEnabled = shouldUseTouchControls(this);
 
     const baseWidth = Math.max(2200, Math.max(...this.currentLevel.platforms.map((p) => p.x + p.width)) + 400);
     const lengthBoost = LENGTH_BOOST_BY_LEVEL[this.levelIndex] ?? this.levelIndex * 850;
@@ -216,8 +223,10 @@ export class WorldScene extends Phaser.Scene {
     this.playLevelMusic();
 
     this.events.on('player-jumped', this.playJumpSfx, this);
+    this.game.events.on('controls:pause', this.queueTouchPauseToggle, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off('player-jumped', this.playJumpSfx, this);
+      this.game.events.off('controls:pause', this.queueTouchPauseToggle, this);
       this.pauseKey?.destroy();
       this.escapeKey?.destroy();
       this.currentMusic?.stop();
@@ -537,7 +546,9 @@ export class WorldScene extends Phaser.Scene {
       .text(
         690,
         245,
-        'Controls\nLeft / Right: move\nUp or Space: jump\nP or Esc: resume\nH: toggle help',
+        this.touchControlsEnabled
+          ? 'Controls\nBottom-left arrows: move\nBottom-right JUMP: jump\nTop-right PAUSE: pause / resume'
+          : 'Controls\nLeft / Right: move\nUp or Space: jump\nP or Esc: resume\nH: toggle help',
         {
           fontFamily: 'monospace',
           fontSize: '20px',
@@ -551,7 +562,7 @@ export class WorldScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(1202);
     const footer = this.add
-      .text(640, 518, 'Press P or Esc to continue', {
+      .text(640, 518, this.touchControlsEnabled ? 'Touch PAUSE in the top-right corner to continue' : 'Press P or Esc to continue', {
         fontFamily: 'monospace',
         fontSize: '18px',
         color: '#b7ffca',
@@ -758,6 +769,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private didRequestPauseToggle(): boolean {
+    if (this.touchPauseRequested) {
+      this.touchPauseRequested = false;
+      return true;
+    }
+
     if (this.pauseKey && Phaser.Input.Keyboard.JustDown(this.pauseKey)) {
       return true;
     }
@@ -780,6 +796,10 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.game.events.emit('hud:pause', { paused: this.isPaused });
+  }
+
+  private queueTouchPauseToggle(): void {
+    this.touchPauseRequested = true;
   }
 
   private pushHud(): void {
