@@ -30,9 +30,9 @@
     { "x": 2010, "y": 460, "width": 280, "height": 16 }
   ],
   "enemies": [
-    { "id": "europa-drone-1", "x": 590, "y": 600, "patrolDistance": 130, "speed": 100 },
-    { "id": "europa-drone-2", "x": 1110, "y": 440, "patrolDistance": 90, "speed": 110 },
-    { "id": "europa-drone-3", "x": 2060, "y": 440, "patrolDistance": 110, "speed": 100 }
+    { "id": "europa-rover-1", "x": 590, "y": 600, "kind": "ground", "patrolDistance": 130, "speed": 100 },
+    { "id": "europa-drone-2", "x": 1110, "y": 440, "kind": "flying", "patrolDistance": 90, "speed": 110 },
+    { "id": "europa-drone-3", "x": 2060, "y": 440, "kind": "flying", "patrolDistance": 110, "speed": 100 }
   ],
   "checkpoints": [
     { "x": 980, "y": 430 },

@@ -1,7 +1,7 @@
 import { animationKeys, audioKeys, characterFrames, textureKeys } from '../assets/assetKeys';
 import { Player } from '../entities/Player';
 import { levelCount, loadLevelByIndex } from '../levels/registry';
-import type { LevelCollectible, LevelData, LevelHazard, LevelTheme } from '../types/level';
+import type { LevelCollectible, LevelData, LevelEnemy, LevelHazard, LevelTheme } from '../types/level';
 import { shouldUseTouchControls } from '../utils/device';
 
 interface WorldInitData {
@@ -72,6 +72,8 @@ const LENGTH_BOOST_BY_LEVEL = [0, 900, 1800] as const;
 const GROUND_SEGMENT_WIDTH = 64;
 const GROUND_THICKNESS = 80;
 const GROUND_TOP_Y = 640;
+const GROUND_ENEMY_EDGE_MARGIN = 22;
+const MIN_GROUND_PATROL_HALF_SPAN = 30;
 
 export class WorldScene extends Phaser.Scene {
   private levelIndex = 0;
@@ -189,8 +191,6 @@ export class WorldScene extends Phaser.Scene {
     this.goal.refreshBody();
 
     this.physics.add.collider(this.player.sprite, this.platforms);
-    this.physics.add.collider(this.enemies, this.platforms);
-
     this.physics.add.overlap(this.player.sprite, this.hazards, (_, hazardObj) => {
       this.onHazardHit(hazardObj as Phaser.Physics.Arcade.Sprite);
     });
@@ -258,20 +258,87 @@ export class WorldScene extends Phaser.Scene {
 
     this.enemies.getChildren().forEach((enemyObj) => {
       const enemy = enemyObj as Phaser.Physics.Arcade.Sprite;
+      const kind = enemy.getData('kind') as LevelEnemy['kind'];
       const originX = enemy.getData('originX') as number;
+      const originY = enemy.getData('originY') as number;
       const patrolDistance = enemy.getData('patrolDistance') as number;
       const speed = enemy.getData('speed') as number;
-      const minX = originX - patrolDistance;
-      const maxX = originX + patrolDistance;
+      let direction = enemy.getData('direction') as number;
 
-      if (enemy.x <= minX) {
-        enemy.setData('direction', 1);
-      } else if (enemy.x >= maxX) {
-        enemy.setData('direction', -1);
+      if (kind === 'flying') {
+        const safeBounds = {
+          top: originY,
+          left: (enemy.getData('supportLeft') as number | undefined) ?? 36,
+          right: (enemy.getData('supportRight') as number | undefined) ?? this.worldWidth - 36
+        };
+        const minX = Math.max(originX - patrolDistance, safeBounds.left);
+        const maxX = Math.min(originX + patrolDistance, safeBounds.right);
+
+        if (enemy.x <= minX) {
+          enemy.setX(minX);
+          direction = 1;
+        } else if (enemy.x >= maxX) {
+          enemy.setX(maxX);
+          direction = -1;
+        }
+
+        enemy.setData('direction', direction);
+        enemy.setVelocityX(speed * direction);
+        enemy.setFlipX(direction < 0);
+
+        const hoverClearance = enemy.getData('hoverClearance') as number;
+        const bobAmplitude = enemy.getData('bobAmplitude') as number;
+        const bobSpeed = enemy.getData('bobSpeed') as number;
+        const bobOffset = enemy.getData('bobOffset') as number;
+        const highestSurface = this.highestSolidTopAt(enemy.x);
+        const safeBaseY = highestSurface - hoverClearance - bobAmplitude;
+        const constrainedBaseY = Math.min(originY, safeBaseY);
+        enemy.setY(constrainedBaseY + Math.sin(now * bobSpeed + bobOffset) * bobAmplitude);
+      } else {
+        const safeBounds = this.safeSurfaceBoundsAtExactX(enemy.x, originY + 8);
+        if (!safeBounds) {
+          const fallbackX = (enemy.getData('lastSafeX') as number | undefined) ?? originX;
+          const fallbackBounds = this.nearestSafeSurfaceBoundsAtExactX(fallbackX, originY + 8);
+          if (!fallbackBounds) {
+            enemy.setVelocityX(0);
+            enemy.setX(originX);
+            enemy.setY(this.surfaceTopAt(originX, originY + 8) - 8);
+            return;
+          }
+
+          enemy.setX(Phaser.Math.Clamp(fallbackX, fallbackBounds.left, fallbackBounds.right));
+          enemy.setY(fallbackBounds.top - 8);
+          direction *= -1;
+          enemy.setData('direction', direction);
+          enemy.setVelocityX(speed * direction);
+          enemy.setFlipX(direction < 0);
+          return;
+        }
+
+        enemy.setData('lastSafeX', enemy.x);
+        const minX = Math.max(originX - patrolDistance, safeBounds.left);
+        const maxX = Math.min(originX + patrolDistance, safeBounds.right);
+        const lookAheadX = enemy.x + direction * 20;
+        const lookAheadBounds = this.safeSurfaceBoundsAtExactX(lookAheadX, originY + 8);
+        const turnThreshold = 6;
+
+        if (direction < 0 && (enemy.x <= minX + turnThreshold || !lookAheadBounds)) {
+          direction = 1;
+        } else if (direction > 0 && (enemy.x >= maxX - turnThreshold || !lookAheadBounds)) {
+          direction = -1;
+        }
+
+        if (enemy.x < minX - 4) {
+          enemy.setX(minX);
+        } else if (enemy.x > maxX + 4) {
+          enemy.setX(maxX);
+        }
+
+        enemy.setData('direction', direction);
+        enemy.setVelocityX(speed * direction);
+        enemy.setFlipX(direction < 0);
+        enemy.setY(safeBounds.top - 8);
       }
-
-      enemy.setVelocityX(speed * (enemy.getData('direction') as number));
-      enemy.setFlipX((enemy.getData('direction') as number) < 0);
     });
 
     this.pushHud();
@@ -356,7 +423,7 @@ export class WorldScene extends Phaser.Scene {
 
   private buildEnemies(): void {
     this.currentLevel.enemies.forEach((enemy) => {
-      this.spawnEnemyAt(enemy.x, enemy.y, enemy.patrolDistance, enemy.speed * this.difficultyFactor);
+      this.spawnEnemyAt(enemy.kind, enemy.x, enemy.y, enemy.patrolDistance, enemy.speed * this.difficultyFactor);
     });
   }
 
@@ -391,7 +458,10 @@ export class WorldScene extends Phaser.Scene {
       const centerX = this.resolveSolidX(startX + i * step);
       const surface = this.surfaceTopAt(centerX, GROUND_TOP_Y);
 
-      this.spawnEnemyAt(centerX + 36, surface - 8, 90 + i * 6, (95 + i * 8) * this.difficultyFactor);
+      const spawnedGround = this.spawnEnemyAt('ground', centerX + 36, surface, 90 + i * 6, (95 + i * 8) * this.difficultyFactor);
+      if (!spawnedGround) {
+        this.spawnEnemyAt('flying', centerX + 36, surface - 86, 84 + i * 6, (90 + i * 8) * this.difficultyFactor);
+      }
 
       if (i % 2 === 0) {
         this.spawnHazardCluster(centerX + 110, surface, this.levelIndex >= 2 ? 3 : 2, 'spike');
@@ -404,7 +474,7 @@ export class WorldScene extends Phaser.Scene {
       collectible.refreshBody();
 
       if (this.levelIndex >= 2 && i % 2 === 1) {
-        this.spawnEnemyAt(centerX + 170, surface - 8, 70 + i * 5, (110 + i * 5) * this.difficultyFactor);
+        this.spawnEnemyAt('flying', centerX + 170, surface - 86, 70 + i * 5, (110 + i * 5) * this.difficultyFactor);
       }
     }
   }
@@ -455,10 +525,25 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private surfaceTopAt(x: number, desiredY: number): number {
+    return this.surfaceBoundsAt(x, desiredY).top;
+  }
+
+  private surfaceBoundsAt(x: number, desiredY: number): { top: number; left: number; right: number } {
     const resolvedX = this.resolveSolidX(x);
 
     let bestSurface = GROUND_TOP_Y;
-    let bestDistance = this.isInsideGap(resolvedX) ? Number.POSITIVE_INFINITY : Math.abs(GROUND_TOP_Y - desiredY);
+    let bestLeft = 36;
+    let bestRight = this.worldWidth - 36;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    if (!this.isInsideGap(resolvedX)) {
+      const leftGap = [...this.groundGaps].reverse().find((gap) => gap.end <= resolvedX);
+      const rightGap = this.groundGaps.find((gap) => gap.start >= resolvedX);
+
+      bestLeft = leftGap ? leftGap.end + 26 : 36;
+      bestRight = rightGap ? rightGap.start - 26 : this.worldWidth - 36;
+      bestDistance = Math.abs(GROUND_TOP_Y - desiredY);
+    }
 
     this.currentLevel.platforms.forEach((platform) => {
       const start = platform.x;
@@ -471,10 +556,254 @@ export class WorldScene extends Phaser.Scene {
       if (distance < bestDistance) {
         bestDistance = distance;
         bestSurface = platform.y;
+        bestLeft = start + 18;
+        bestRight = end - 18;
       }
     });
 
-    return bestSurface;
+    return {
+      top: bestSurface,
+      left: Phaser.Math.Clamp(bestLeft, 36, this.worldWidth - 36),
+      right: Phaser.Math.Clamp(bestRight, 36, this.worldWidth - 36)
+    };
+  }
+
+  private surfaceBoundsAtExactX(x: number, desiredY: number): { top: number; left: number; right: number } | null {
+    const exactX = Phaser.Math.Clamp(x, 36, this.worldWidth - 36);
+    const candidates: Array<{ top: number; left: number; right: number }> = [];
+
+    if (!this.isInsideGap(exactX)) {
+      const leftGap = [...this.groundGaps].reverse().find((gap) => gap.end <= exactX);
+      const rightGap = this.groundGaps.find((gap) => gap.start >= exactX);
+
+      candidates.push({
+        top: GROUND_TOP_Y,
+        left: leftGap ? leftGap.end + 26 : 36,
+        right: rightGap ? rightGap.start - 26 : this.worldWidth - 36
+      });
+    }
+
+    this.currentLevel.platforms.forEach((platform) => {
+      const start = platform.x;
+      const end = platform.x + platform.width;
+      if (exactX < start || exactX > end) {
+        return;
+      }
+
+      candidates.push({
+        top: platform.y,
+        left: start + 18,
+        right: end - 18
+      });
+    });
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    return candidates.reduce((best, candidate) =>
+      Math.abs(candidate.top - desiredY) < Math.abs(best.top - desiredY) ? candidate : best
+    );
+  }
+
+  private safeSurfaceBoundsAtExactX(x: number, desiredY: number): { top: number; left: number; right: number } | null {
+    const surface = this.surfaceBoundsAtExactX(x, desiredY);
+    if (!surface) {
+      return null;
+    }
+
+    const spriteBlockers = this.hazards
+      .getChildren()
+      .map((hazardObj) => hazardObj as Phaser.Physics.Arcade.Sprite)
+      .filter((hazard) => Math.abs(hazard.y - surface.top) <= 14)
+      .map((hazard) => {
+        const hazardKind = (hazard.getData('kind') as LevelHazard['kind'] | undefined) ?? 'spike';
+        const defaultPadding = hazardKind === 'lava' ? 40 : 28;
+        const blockerHalfWidth = (hazard.getData('blockerHalfWidth') as number | undefined) ?? hazard.displayWidth * 0.5 + defaultPadding;
+        return {
+          left: Math.max(surface.left, hazard.x - blockerHalfWidth),
+          right: Math.min(surface.right, hazard.x + blockerHalfWidth)
+        };
+      })
+      .filter((blocker) => blocker.right > surface.left && blocker.left < surface.right);
+
+    const levelBlockers = this.currentLevel.hazards
+      .filter((hazard) => hazard.kind !== 'laser')
+      .map((hazard) => {
+        const hazardX = this.resolveSolidX(hazard.x);
+        const hazardTop = this.surfaceTopAt(hazardX, hazard.y);
+        if (Math.abs(hazardTop - surface.top) > 14) {
+          return null;
+        }
+
+        const blockerPadding = hazard.kind === 'lava' ? 42 : 30;
+        const blockerHalfWidth = Math.max(hazard.width * 0.5 + blockerPadding, 24);
+        return {
+          left: Math.max(surface.left, hazardX - blockerHalfWidth),
+          right: Math.min(surface.right, hazardX + blockerHalfWidth)
+        };
+      })
+      .filter((blocker): blocker is { left: number; right: number } => Boolean(blocker))
+      .filter((blocker) => blocker.right > surface.left && blocker.left < surface.right)
+      .sort((a, b) => a.left - b.left);
+
+    const blockers = [...spriteBlockers, ...levelBlockers].sort((a, b) => a.left - b.left);
+
+    if (blockers.length === 0) {
+      return this.insetSurfaceBounds(surface, GROUND_ENEMY_EDGE_MARGIN);
+    }
+
+    const mergedBlockers: Array<{ left: number; right: number }> = [];
+    blockers.forEach((blocker) => {
+      const previous = mergedBlockers.at(-1);
+      if (!previous || blocker.left > previous.right) {
+        mergedBlockers.push({ ...blocker });
+        return;
+      }
+
+      previous.right = Math.max(previous.right, blocker.right);
+    });
+
+    const safeSegments: Array<{ left: number; right: number }> = [];
+    let cursor = surface.left;
+
+    mergedBlockers.forEach((blocker) => {
+      if (blocker.left > cursor) {
+        safeSegments.push({ left: cursor, right: blocker.left });
+      }
+
+      cursor = Math.max(cursor, blocker.right);
+    });
+
+    if (cursor < surface.right) {
+      safeSegments.push({ left: cursor, right: surface.right });
+    }
+
+    if (safeSegments.length === 0) {
+      return null;
+    }
+
+    const containingSegment = safeSegments.find((segment) => x >= segment.left && x <= segment.right);
+    if (containingSegment) {
+      return this.insetSurfaceBounds({ top: surface.top, left: containingSegment.left, right: containingSegment.right }, GROUND_ENEMY_EDGE_MARGIN);
+    }
+
+    return null;
+  }
+
+  private nearestSafeSurfaceBoundsAtExactX(x: number, desiredY: number): { top: number; left: number; right: number } | null {
+    const surface = this.surfaceBoundsAtExactX(x, desiredY);
+    if (!surface) {
+      return null;
+    }
+
+    const safeBounds = this.safeSurfaceBoundsAtExactX(x, desiredY);
+    if (safeBounds) {
+      return safeBounds;
+    }
+
+    const spriteBlockers = this.hazards
+      .getChildren()
+      .map((hazardObj) => hazardObj as Phaser.Physics.Arcade.Sprite)
+      .filter((hazard) => Math.abs(hazard.y - surface.top) <= 14)
+      .map((hazard) => {
+        const hazardKind = (hazard.getData('kind') as LevelHazard['kind'] | undefined) ?? 'spike';
+        const defaultPadding = hazardKind === 'lava' ? 40 : 28;
+        const blockerHalfWidth = (hazard.getData('blockerHalfWidth') as number | undefined) ?? hazard.displayWidth * 0.5 + defaultPadding;
+        return {
+          left: Math.max(surface.left, hazard.x - blockerHalfWidth),
+          right: Math.min(surface.right, hazard.x + blockerHalfWidth)
+        };
+      })
+      .filter((blocker) => blocker.right > surface.left && blocker.left < surface.right);
+
+    const levelBlockers = this.currentLevel.hazards
+      .filter((hazard) => hazard.kind !== 'laser')
+      .map((hazard) => {
+        const hazardSurface = this.surfaceBoundsAtExactX(hazard.x, hazard.y);
+        if (!hazardSurface || Math.abs(hazardSurface.top - surface.top) > 14) {
+          return null;
+        }
+
+        const blockerPadding = hazard.kind === 'lava' ? 42 : 30;
+        const blockerHalfWidth = Math.max(hazard.width * 0.5 + blockerPadding, 24);
+        return {
+          left: Math.max(surface.left, hazard.x - blockerHalfWidth),
+          right: Math.min(surface.right, hazard.x + blockerHalfWidth)
+        };
+      })
+      .filter((blocker): blocker is { left: number; right: number } => Boolean(blocker));
+
+    const mergedBlockers: Array<{ left: number; right: number }> = [...spriteBlockers, ...levelBlockers]
+      .sort((a, b) => a.left - b.left)
+      .reduce<Array<{ left: number; right: number }>>((acc, blocker) => {
+        const previous = acc.at(-1);
+        if (!previous || blocker.left > previous.right) {
+          acc.push({ ...blocker });
+          return acc;
+        }
+
+        previous.right = Math.max(previous.right, blocker.right);
+        return acc;
+      }, []);
+
+    const safeSegments: Array<{ left: number; right: number }> = [];
+    let cursor = surface.left;
+
+    mergedBlockers.forEach((blocker) => {
+      if (blocker.left > cursor) {
+        safeSegments.push({ left: cursor, right: blocker.left });
+      }
+
+      cursor = Math.max(cursor, blocker.right);
+    });
+
+    if (cursor < surface.right) {
+      safeSegments.push({ left: cursor, right: surface.right });
+    }
+
+    if (safeSegments.length === 0) {
+      return null;
+    }
+
+    const nearestSegment = safeSegments.reduce((best, segment) => {
+      const bestDistance = x < best.left ? best.left - x : x - best.right;
+      const segmentDistance = x < segment.left ? segment.left - x : x - segment.right;
+      return segmentDistance < bestDistance ? segment : best;
+    });
+
+    return this.insetSurfaceBounds({ top: surface.top, left: nearestSegment.left, right: nearestSegment.right }, GROUND_ENEMY_EDGE_MARGIN);
+  }
+
+  private insetSurfaceBounds(
+    bounds: { top: number; left: number; right: number },
+    margin: number
+  ): { top: number; left: number; right: number } {
+    const left = Math.min(bounds.left + margin, bounds.right);
+    const right = Math.max(bounds.right - margin, left);
+
+    return {
+      top: bounds.top,
+      left,
+      right
+    };
+  }
+
+  private highestSolidTopAt(x: number): number {
+    const resolvedX = Phaser.Math.Clamp(x, 36, this.worldWidth - 36);
+    let highestSurface = GROUND_TOP_Y;
+
+    this.currentLevel.platforms.forEach((platform) => {
+      const start = platform.x;
+      const end = platform.x + platform.width;
+      if (resolvedX < start || resolvedX > end) {
+        return;
+      }
+
+      highestSurface = Math.min(highestSurface, platform.y);
+    });
+
+    return highestSurface;
   }
 
   private spawnHazardCluster(centerX: number, desiredY: number, count: number, kind: LevelHazard['kind']): void {
@@ -488,27 +817,78 @@ export class WorldScene extends Phaser.Scene {
       sprite.setOrigin(0.5, 1);
       sprite.setScale(1.35);
       sprite.setTint(kind === 'lava' ? 0xff6954 : this.palette.hazard);
+      sprite.setData('kind', kind);
+      sprite.setData('blockerHalfWidth', sprite.displayWidth * 0.5 + (kind === 'lava' ? 40 : 28));
       sprite.refreshBody();
     }
   }
 
-  private spawnEnemyAt(x: number, desiredY: number, patrolDistance: number, speed: number): void {
+  private spawnEnemyAt(kind: LevelEnemy['kind'], x: number, desiredY: number, patrolDistance: number, speed: number): boolean {
     const resolvedX = this.resolveSolidX(x);
-    const surface = this.surfaceTopAt(resolvedX, desiredY);
+    const supportBounds =
+      kind === 'ground' ? this.nearestSafeSurfaceBoundsAtExactX(resolvedX, desiredY) : this.surfaceBoundsAt(resolvedX, desiredY);
+    const hoverClearance = 46;
+    const bobAmplitude = kind === 'flying' ? Phaser.Math.Between(8, 14) : 0;
 
-    const sprite = this.enemies.create(resolvedX, surface - 8, textureKeys.characters, characterFrames.enemyFrames[0]) as Phaser.Physics.Arcade.Sprite;
-    sprite.setScale(1.1);
-    sprite.setData('originX', resolvedX);
-    sprite.setData('patrolDistance', patrolDistance);
+    if (!supportBounds) {
+      return false;
+    }
+
+    const effectivePatrolDistance =
+      kind === 'ground'
+        ? Math.min(patrolDistance, Math.max(0, (supportBounds.right - supportBounds.left) * 0.5 - 6))
+        : patrolDistance;
+
+    if (kind === 'ground' && effectivePatrolDistance < MIN_GROUND_PATROL_HALF_SPAN) {
+      return false;
+    }
+
+    const spawnX = kind === 'ground' ? Phaser.Math.Clamp(resolvedX, supportBounds.left, supportBounds.right) : resolvedX;
+    const spawnY =
+      kind === 'flying'
+        ? Math.min(
+            Phaser.Math.Clamp(desiredY, 120, GROUND_TOP_Y - 96),
+            this.highestSolidTopAt(spawnX) - hoverClearance - bobAmplitude
+          )
+        : supportBounds.top - 8;
+    const frame = kind === 'flying' ? characterFrames.enemyFlyingFrames[0] : characterFrames.enemyGroundFrames[0];
+    const animationKey = kind === 'flying' ? animationKeys.enemyFly : animationKeys.enemyGround;
+    const sprite = this.enemies.create(spawnX, spawnY, textureKeys.characters, frame) as Phaser.Physics.Arcade.Sprite;
+
+    sprite.setScale(kind === 'flying' ? 1.1 : 1.18);
+    sprite.setData('originX', spawnX);
+    sprite.setData('originY', spawnY);
+    sprite.setData('kind', kind);
+    sprite.setData('patrolDistance', effectivePatrolDistance);
     sprite.setData('speed', speed);
     sprite.setData('direction', 1);
-    sprite.play(animationKeys.enemyHover);
+    sprite.play(animationKey);
+
+    if (kind === 'flying') {
+      sprite.setData('hoverClearance', hoverClearance);
+      sprite.setData('bobAmplitude', bobAmplitude);
+      sprite.setData('bobSpeed', Phaser.Math.FloatBetween(0.0034, 0.0042));
+      sprite.setData('bobOffset', Phaser.Math.FloatBetween(0, Math.PI * 2));
+    }
+
+    if (kind === 'ground') {
+      sprite.setData('lastSafeX', spawnX);
+      sprite.setData('supportLeft', supportBounds.left);
+      sprite.setData('supportRight', supportBounds.right);
+    }
 
     const body = sprite.body as Phaser.Physics.Arcade.Body | null;
     if (body) {
-      body.setSize(16, 14);
-      body.setOffset(4, 6);
+      if (kind === 'flying') {
+        body.setSize(16, 14);
+        body.setOffset(4, 6);
+      } else {
+        body.setSize(18, 11);
+        body.setOffset(3, 11);
+      }
     }
+
+    return true;
   }
 
   private createPauseOverlay(): void {
@@ -529,7 +909,7 @@ export class WorldScene extends Phaser.Scene {
       .text(
         185,
         245,
-        'Objective\nReach the shuttle before oxygen or time expires.\n\nItems\nCrystal: score + oxygen\nFlag terminal: checkpoint\nDrones / spikes / lava: lose one life\nGround gaps: falling costs one life',
+        'Objective\nReach the shuttle before oxygen or time expires.\n\nItems\nCrystal: score + oxygen\nFlag terminal: checkpoint\nDrones / rovers / spikes / lava: lose one life\nGround gaps: falling costs one life',
         {
           fontFamily: 'monospace',
           fontSize: '18px',

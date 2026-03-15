@@ -41,6 +41,7 @@ export interface LevelEnemy {
   id: string;
   x: number;
   y: number;
+  kind: 'flying' | 'ground';
   patrolDistance: number;
   speed: number;
 }

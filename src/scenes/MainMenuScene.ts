@@ -88,8 +88,8 @@ export class MainMenuScene extends Phaser.Scene {
       strokeThickness: 5
     });
 
-    this.add.sprite(250, 458, textureKeys.characters, characterFrames.enemyFrames[1]).setScale(2);
-    this.add.text(294, 444, 'Drone: lose one life on hit', {
+    this.add.sprite(250, 458, textureKeys.characters, characterFrames.enemyMenuFrame).setScale(2);
+    this.add.text(294, 444, 'Drones/rovers: lose one life on hit', {
       fontFamily: 'monospace',
       fontSize: '20px',
       color: '#ffffff',

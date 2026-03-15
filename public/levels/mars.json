@@ -29,9 +29,9 @@
     { "x": 1650, "y": 450, "width": 260, "height": 16 }
   ],
   "enemies": [
-    { "id": "mars-drone-1", "x": 840, "y": 590, "patrolDistance": 120, "speed": 92 },
-    { "id": "mars-drone-2", "x": 1960, "y": 590, "patrolDistance": 140, "speed": 105 },
-    { "id": "mars-drone-3", "x": 1380, "y": 450, "patrolDistance": 80, "speed": 85 }
+    { "id": "mars-rover-1", "x": 840, "y": 590, "kind": "ground", "patrolDistance": 120, "speed": 92 },
+    { "id": "mars-rover-2", "x": 1960, "y": 590, "kind": "ground", "patrolDistance": 140, "speed": 105 },
+    { "id": "mars-drone-3", "x": 1380, "y": 450, "kind": "flying", "patrolDistance": 80, "speed": 85 }
   ],
   "checkpoints": [
     { "x": 960, "y": 420 },

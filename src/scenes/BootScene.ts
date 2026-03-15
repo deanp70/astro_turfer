@@ -80,10 +80,19 @@ export class BootScene extends Phaser.Scene {
       });
     }
 
-    if (!this.anims.exists(animationKeys.enemyHover)) {
+    if (!this.anims.exists(animationKeys.enemyFly)) {
       this.anims.create({
-        key: animationKeys.enemyHover,
-        frames: characterFrames.enemyFrames.map((frame) => ({ key: textureKeys.characters, frame })),
+        key: animationKeys.enemyFly,
+        frames: characterFrames.enemyFlyingFrames.map((frame) => ({ key: textureKeys.characters, frame })),
+        frameRate: 10,
+        repeat: -1
+      });
+    }
+
+    if (!this.anims.exists(animationKeys.enemyGround)) {
+      this.anims.create({
+        key: animationKeys.enemyGround,
+        frames: characterFrames.enemyGroundFrames.map((frame) => ({ key: textureKeys.characters, frame })),
         frameRate: 10,
         repeat: -1
       });

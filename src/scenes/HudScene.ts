@@ -167,7 +167,7 @@ export class HudScene extends Phaser.Scene {
 
   private buildHelpCopy(): string {
     const base =
-      'OBJECTIVE: collect crystals, avoid hazards, and reach the shuttle before O2 or time runs out.\nITEMS: blue crystal = score+oxygen, flag terminal = checkpoint, drones/spikes = lose one life, shuttle = exit.';
+      'OBJECTIVE: collect crystals, avoid hazards, and reach the shuttle before O2 or time runs out.\nITEMS: blue crystal = score+oxygen, flag terminal = checkpoint, drones/rovers/spikes = lose one life, shuttle = exit.';
 
     if (!this.touchControlsEnabled) {
       return `${base}\nCONTROLS: left/right move, up or space jump, P or Esc pause, H toggle help.`;
