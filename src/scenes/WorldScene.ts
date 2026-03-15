@@ -147,7 +147,7 @@ export class WorldScene extends Phaser.Scene {
     this.timeLeft = Math.max(95, this.currentLevel.timeLimitSeconds - this.levelIndex * 8);
     this.groundGaps = this.buildGapPattern();
 
-    this.physics.world.setBounds(0, 0, this.worldWidth, 720);
+    this.physics.world.setBounds(0, 0, this.worldWidth, 920);
     this.cameras.main.setBounds(0, 0, this.worldWidth, 720);
     this.setBackground(this.currentLevel);
 
@@ -172,7 +172,13 @@ export class WorldScene extends Phaser.Scene {
     const goalX = this.resolveSolidX(desiredGoalX);
     const goalSurface = this.surfaceTopAt(goalX, this.currentLevel.goal.y);
 
-    this.goal = this.physics.add.staticSprite(goalX, goalSurface, textureKeys.goal).setOrigin(0.5, 1).setScale(0.3);
+    this.add.image(goalX, goalSurface, textureKeys.goal).setOrigin(0.5, 1).setScale(0.3).setDepth(15);
+
+    this.goal = this.physics.add
+      .staticSprite(goalX, goalSurface, textureKeys.goalMenu)
+      .setOrigin(0.5, 1)
+      .setDisplaySize(58, 44)
+      .setAlpha(0.001);
     this.goal.refreshBody();
 
     this.physics.add.collider(this.player.sprite, this.platforms);
@@ -497,26 +503,66 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private createPauseOverlay(): void {
-    const dim = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.68).setScrollFactor(0).setDepth(1200);
-
-    const text = this.add
+    const dim = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.7).setScrollFactor(0).setDepth(1200);
+    const panel = this.add.image(640, 360, textureKeys.hudPanel).setDisplaySize(980, 430).setAlpha(0.96).setScrollFactor(0).setDepth(1201);
+    const title = this.add
+      .text(640, 182, 'PAUSED', {
+        fontFamily: 'monospace',
+        fontSize: '40px',
+        color: '#f5f8ff',
+        stroke: '#000000',
+        strokeThickness: 7
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(1202);
+    const objective = this.add
       .text(
-        205,
-        146,
-        'PAUSED\n\nObjective:\nCollect crystals and reach the shuttle before oxygen/time expires.\n\nItem guide:\n- Crystal: increases score and oxygen\n- Flag terminal: checkpoint respawn\n- Drones and spikes: lose one life on contact\n- Shuttle: finishes the level\n\nControls:\nLeft/Right move, Up or Space jump\nP or Esc resume, H toggle help panel',
+        185,
+        245,
+        'Objective\nReach the shuttle before oxygen or time expires.\n\nItems\nCrystal: score + oxygen\nFlag terminal: checkpoint\nDrones / spikes / lava: lose one life\nGround gaps: falling costs one life',
         {
           fontFamily: 'monospace',
-          fontSize: '28px',
-          color: '#f0f4ff',
+          fontSize: '18px',
+          color: '#e5f0ff',
           stroke: '#000000',
-          strokeThickness: 6,
-          lineSpacing: 8
+          strokeThickness: 4,
+          lineSpacing: 8,
+          wordWrap: { width: 400 }
         }
       )
       .setScrollFactor(0)
-      .setDepth(1201);
+      .setDepth(1202);
+    const controls = this.add
+      .text(
+        690,
+        245,
+        'Controls\nLeft / Right: move\nUp or Space: jump\nP or Esc: resume\nH: toggle help',
+        {
+          fontFamily: 'monospace',
+          fontSize: '20px',
+          color: '#d6ecff',
+          stroke: '#000000',
+          strokeThickness: 4,
+          lineSpacing: 10,
+          wordWrap: { width: 330 }
+        }
+      )
+      .setScrollFactor(0)
+      .setDepth(1202);
+    const footer = this.add
+      .text(640, 518, 'Press P or Esc to continue', {
+        fontFamily: 'monospace',
+        fontSize: '18px',
+        color: '#b7ffca',
+        stroke: '#000000',
+        strokeThickness: 4
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(1202);
 
-    this.pauseOverlay = this.add.container(0, 0, [dim, text]);
+    this.pauseOverlay = this.add.container(0, 0, [dim, panel, title, objective, controls, footer]);
     this.pauseOverlay.setVisible(false);
   }
 

@@ -24,7 +24,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.add.rectangle(640, 360, 1040, 560, 0x0a1020, 0.86);
 
     this.add
-      .text(640, 110, 'ASTRONAUT FRONTIER', {
+      .text(640, 110, 'ASTRO TURFER', {
         fontFamily: 'monospace',
         fontSize: '56px',
         color: '#f5f7ff',
